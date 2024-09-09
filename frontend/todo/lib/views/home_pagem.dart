@@ -7,6 +7,7 @@ import 'package:todo/models/user.dart';
 import 'package:todo/models/todo.dart'; // Certifique-se de que o caminho está correto
 import 'package:todo/views/login.dart';
 import 'groups_manager.dart';
+import 'signup.dart';
 
 class GroupTodo {
   final int id;
@@ -507,7 +508,7 @@ class _SlidableListScreenState extends State<SlidableListScreen> {
       MaterialPageRoute(
         builder: (context) => LoginPage(),
       ),
-      (Route<dynamic> route) => false,  // Remove a página atual da pilha
+      (Route<dynamic> route) => false, // Remove a página atual da pilha
     );
   }
 
@@ -533,7 +534,19 @@ class _SlidableListScreenState extends State<SlidableListScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => GroupManagerApp(user: widget.user),
+                        builder: (context) =>
+                            SignupPage(user: widget.user,isEditing: true,),
+                      ),
+                    );
+                  }, 
+                  icon: const Icon(Icons.edit)),
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            GroupManagerApp(user: widget.user),
                       ),
                     );
                   },
