@@ -1,0 +1,29 @@
+# Use uma imagem base do Python
+FROM python:3.12.3
+
+# Defina o diretório de trabalho
+WORKDIR /app
+
+# Copie os arquivos de dependências
+COPY requirements.txt /app/
+
+# Instale as dependências
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copie o restante do código da aplicação
+COPY . /app/
+
+# Defina as variáveis de ambiente
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Exponha a porta que o Django irá usar
+EXPOSE 8000
+
+# Comando para rodar o servidor Django
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+# docker run -p 8000:8000 mydjangoapp
+# docker start mydjangoapp_container
+# docker start --name mydjangoapp_container -p 8000:8000 mydjangoapp
+
