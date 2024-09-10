@@ -169,109 +169,126 @@ class _GroupManagerScreenState extends State<GroupManagerScreen>
     }
   }
 
-  Future<void> _showAddUserGroupDialog(int group) async {
-    // Função para buscar todos os usuários disponíveis
-    Future<List<User>> fetchAllUsers() async {
-      final response = await http.get(Uri.parse('http://10.0.2.2:8000/users/'));
-      if (response.statusCode == 200) {
-        List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => User.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to load users');
-      }
+Future<void> _showAddUserGroupDialog(int group) async {
+  // Função para buscar todos os usuários disponíveis
+  Future<List<User>> fetchAllUsers() async {
+    final response = await http.get(Uri.parse('http://10.0.2.2:8000/users/'));
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => User.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load users');
     }
-
-    return showDialog<void>(
-      context: context,
-      barrierDismissible:
-          true, // Usuário pode dispensar tocando fora do diálogo
-      builder: (BuildContext context) {
-        return FutureBuilder<List<User>>(
-          future: fetchAllUsers(), // Carrega todos os usuários
-          builder: (BuildContext context, AsyncSnapshot<List<User>> snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return AlertDialog(
-                title: const Text('Carregando...'),
-                content: const Center(child: CircularProgressIndicator()),
-              );
-            } else if (snapshot.hasError) {
-              return AlertDialog(
-                title: const Text('Erro'),
-                content: Text('Erro ao carregar usuários: ${snapshot.error}'),
-                actions: <Widget>[
-                  TextButton(
-                    child: const Text('OK'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ],
-              );
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return AlertDialog(
-                title: const Text('Nenhum usuário encontrado'),
-                actions: <Widget>[
-                  TextButton(
-                    child: const Text('OK'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ],
-              );
-            } else {
-              List<User> users = snapshot.data!;
-
-              // Configura a ComboBox
-              String? selectedUserId;
-
-              return AlertDialog(
-                title: const Text('Adicionar Usuário ao Grupo'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: selectedUserId,
-                      hint: const Text('Selecione um usuário'),
-                      items: users.map((User user) {
-                        return DropdownMenuItem<String>(
-                          value: user.id.toString(),
-                          child: Text(user.name),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          selectedUserId = newValue;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                actions: <Widget>[
-                  TextButton(
-                    child: const Text('Cancelar'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                  ElevatedButton(
-                    child: const Text('Adicionar'),
-                    onPressed: () {
-                      if (selectedUserId != null) {
-                        // Adiciona o usuário ao grupo
-                        _addUserToGroup(group, int.parse(selectedUserId!));
-                        Navigator.of(context).pop();
-                      }
-                    },
-                  ),
-                ],
-              );
-            }
-          },
-        );
-      },
-    );
   }
+
+  // Função para buscar os usuários que já estão no grupo
+  Future<List<User>> fetchUsersInGroup(int groupId) async {
+    final response = await http.get(Uri.parse(
+        'http://10.0.2.2:8000/users/listar_grupos_usuario_por_grupo?group_id=$groupId'));
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body)['usuarios'];
+      return data.map((json) => User.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load users in group');
+    }
+  }
+
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: true, // Usuário pode dispensar tocando fora do diálogo
+    builder: (BuildContext context) {
+      return FutureBuilder<List<List<User>>>(
+        future: Future.wait([fetchAllUsers(), fetchUsersInGroup(group)]), // Carrega todos os usuários e os do grupo
+        builder: (BuildContext context, AsyncSnapshot<List<List<User>>> snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return AlertDialog(
+              title: const Text('Carregando...'),
+              content: const Center(child: CircularProgressIndicator()),
+            );
+          } else if (snapshot.hasError) {
+            return AlertDialog(
+              title: const Text('Erro'),
+              content: Text('Erro ao carregar usuários: ${snapshot.error}'),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('OK'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return AlertDialog(
+              title: const Text('Nenhum usuário encontrado'),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('OK'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          } else {
+            // Lista de todos os usuários e usuários já no grupo
+            List<User> allUsers = snapshot.data![0];
+            List<User> usersInGroup = snapshot.data![1];
+
+            // Remove os usuários que já estão no grupo
+            List<User> availableUsers = allUsers.where((user) => !usersInGroup.any((groupUser) => groupUser.id == user.id)).toList();
+
+            // Configura a ComboBox
+            String? selectedUserId;
+
+            return AlertDialog(
+              title: const Text('Adicionar Usuário ao Grupo'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selectedUserId,
+                    hint: const Text('Selecione um usuário'),
+                    items: availableUsers.map((User user) {
+                      return DropdownMenuItem<String>(
+                        value: user.id.toString(),
+                        child: Text(user.name),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        selectedUserId = newValue;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('Cancelar'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                ElevatedButton(
+                  child: const Text('Adicionar'),
+                  onPressed: () {
+                    if (selectedUserId != null) {
+                      // Adiciona o usuário ao grupo
+                      _addUserToGroup(group, int.parse(selectedUserId!));
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
+              ],
+            );
+          }
+        },
+      );
+    },
+  );
+}
+
 
   Future<void> _showAddGroupDialog({GroupTodo? group}) async {
     final TextEditingController _controller = TextEditingController(
@@ -652,32 +669,4 @@ Future<void> _updateToDoItems(Future<List<ToDoItem>> todoItemsFuture) async {
     }
   }
 
-  // Future<bool> _showConfirmDeleteUserDialog(User user) async {
-  //   return await showDialog<bool>(
-  //         context: context,
-  //         barrierDismissible: false,
-  //         builder: (BuildContext context) {
-  //           return AlertDialog(
-  //             title: const Text('Confirmação'),
-  //             content: Text(
-  //                 'Você tem certeza que deseja remover o usuário ${user.name} do grupo?'),
-  //             actions: <Widget>[
-  //               TextButton(
-  //                 child: const Text('Cancelar'),
-  //                 onPressed: () {
-  //                   Navigator.of(context).pop(false);
-  //                 },
-  //               ),
-  //               ElevatedButton(
-  //                 child: const Text('Remover'),
-  //                 onPressed: () {
-  //                   Navigator.of(context).pop(true);
-  //                 },
-  //               ),
-  //             ],
-  //           );
-  //         },
-  //       ) ??
-  //       false;
-  // }
 }
